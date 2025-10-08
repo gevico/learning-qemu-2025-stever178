@@ -164,3 +164,12 @@ static bool trans_hfence_vvma(DisasContext *ctx, arg_sfence_vma *a)
 #endif
     return false;
 }
+
+static bool trans_custom_dma(DisasContext *ctx, arg_custom_dma *a)
+{
+    gen_helper_custom_dma(tcg_env, 
+                          cpu_gpr[a->rd],    // dst
+                          cpu_gpr[a->rs1],   // src  
+                          cpu_gpr[a->rs2]);  // grain_size
+    return true;
+}

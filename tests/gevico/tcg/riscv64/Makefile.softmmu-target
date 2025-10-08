@@ -17,7 +17,8 @@ CFLAGS += -I$(TEST_SRC)/crt/ \
           -Wa,--noexecstack \
           -fvisibility=hidden -nostdlib \
           -Wl,--build-id=none \
-          -fno-builtin -mrelax
+          -fno-builtin -mrelax \
+          -fno-stack-protector
 
 %: %.c $(CRT_SCRIPT) $(LINK_SCRIPT)
 	$(CC) $(CFLAGS) $(CRT_SCRIPT) $(LDFLAGS) $< -o $@
