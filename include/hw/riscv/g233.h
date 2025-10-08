@@ -24,6 +24,7 @@
 #include "hw/boards.h"
 #include "hw/riscv/riscv_hart.h"
 #include "hw/gpio/sifive_gpio.h"
+#include "hw/timer/sifive_pwm.h"
 
 #define TYPE_RISCV_G233_SOC "riscv.gevico.g233.soc"
 #define RISCV_G233_SOC(obj) \
