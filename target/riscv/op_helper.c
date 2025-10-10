@@ -720,8 +720,11 @@ target_ulong helper_hyp_hlvx_wu(CPURISCVState *env, target_ulong addr)
 void helper_custom_dma(CPURISCVState *env, target_ulong dst,
                       target_ulong src, target_ulong grain_size)
 {
+    /*
     qemu_log("DMA: ENTER - dst=0x%lx, src=0x%lx, grain=%lu\n", 
              dst, src, grain_size);
+    */
+    
     int grain = grain_size & 0x3;
     int block_size;
     
@@ -731,21 +734,20 @@ void helper_custom_dma(CPURISCVState *env, target_ulong dst,
         case 2: block_size = 32; break;
         default: block_size = 8; break;
     }
+    /*
+    qemu_log("DMA: Processing %dx%d matrix transpose\n",
+             block_size, block_size);
+    */
     
     for (int i = 0; i < block_size; i++) {
         for (int j = 0; j < block_size; j++) {
-            MemOpIdx oi = make_memop_idx(MO_TEUL, 0);
-            target_ulong src_addr = src + (j * block_size + i) * sizeof(uint32_t);
-            target_ulong dst_addr = dst + (i * block_size + j) * sizeof(uint32_t);
+            target_ulong src_offset = (j * block_size + i) * sizeof(uint32_t);
+            target_ulong dst_offset = (i * block_size + j) * sizeof(uint32_t);
             
-            uint32_t value = cpu_ldl_mmu(env, src_addr, oi, GETPC());
-            cpu_stl_mmu(env, dst_addr, value, oi, GETPC());
+            uint32_t value = cpu_ldl_data(env, src + src_offset);
+            cpu_stl_data(env, dst + dst_offset, value);
         }
     }
-
-    // MemOpIdx oi = make_memop_idx(MO_TEUQ, 0);
-    // target_ulong val = cpu_ldq_mmu(env, env->gpr[rs1], oi, GETPC());
-    // env->gpr[rd] = val * val * val;
 }
 
 #endif /* !CONFIG_USER_ONLY */
