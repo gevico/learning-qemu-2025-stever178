@@ -44,9 +44,13 @@ static const MemMapEntry g233_memmap[] = {
     [G233_DEV_UART0] =    { 0x10000000,     0x1000 },
     [G233_DEV_GPIO0] =    { 0x10012000,     0x1000 },
     [G233_DEV_PWM0] =     { 0x10015000,     0x1000 },
+    [G233_DEV_SPI0] =     { 0x10018000,     0x1000 },
     [G233_DEV_DRAM] =     { 0x80000000, 0x40000000 },
 };
 
+/* 对象初始化
+ * 在 QEMU 对象模型创建阶段初始化 SoC 的各个子设备
+ */
 static void g233_soc_init(Object *obj)
 {
     /*
@@ -55,8 +59,8 @@ static void g233_soc_init(Object *obj)
      */
     G233SoCState *s = RISCV_G233_SOC(obj);
 
-    object_initialize_child(obj, "g233-cpus", &s->cpus,
-                            TYPE_RISCV_HART_ARRAY);
+    /* CPU 子系统初始化 */
+    object_initialize_child(obj, "g233-cpus", &s->cpus, TYPE_RISCV_HART_ARRAY);
     qdev_prop_set_uint32(DEVICE(&s->cpus), "num-harts", 1);
     qdev_prop_set_uint32(DEVICE(&s->cpus), "hartid-base", 0);
     qdev_prop_set_string(DEVICE(&s->cpus), "cpu-type",
@@ -67,8 +71,14 @@ static void g233_soc_init(Object *obj)
     object_initialize_child(obj, "sifive.gpio0", &s->gpio, TYPE_SIFIVE_GPIO);
     object_property_set_int(OBJECT(&s->gpio), "ngpio",
                             32, &error_abort);
+
+    /* SPI */
+    // object_initialize_child(obj, "spi0", &s->spi, TYPE_G233_SPI);
 }
 
+/* 设备实例化
+ * 在 QEMU 设备实例化阶段完成设备的真实创建
+ */
 static void g233_soc_realize(DeviceState *dev, Error **errp)
 {
     MachineState *ms = MACHINE(qdev_get_machine());
@@ -77,11 +87,14 @@ static void g233_soc_realize(DeviceState *dev, Error **errp)
     const MemMapEntry *memmap = g233_memmap;
 
     /* CPUs realize */
+    /* CPU 子系统初始化 */
     sysbus_realize(SYS_BUS_DEVICE(&s->cpus), &error_fatal);
 
     /* Mask ROM */
+    /* 初始化内存区域 */
     memory_region_init_rom(&s->mask_rom, OBJECT(dev), "riscv.g233.mrom",
                            memmap[G233_DEV_MROM].size, &error_fatal);
+    /* 将内存区域添加到地址空间 */
     memory_region_add_subregion(sys_mem, memmap[G233_DEV_MROM].base,
                                 &s->mask_rom);
 
@@ -134,6 +147,12 @@ static void g233_soc_realize(DeviceState *dev, Error **errp)
     create_unimplemented_device("riscv.g233.pwm0",
         memmap[G233_DEV_PWM0].base, memmap[G233_DEV_PWM0].size);
 
+    /* SPI */
+    // if (!sysbus_realize(SYS_BUS_DEVICE(&s->spi), errp)) {
+    //     return;
+    // }
+    // sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi), 0,
+    //                 memmap[G233_DEV_SPI0].base);
 }
 
 static void g233_soc_class_init(ObjectClass *oc, const void *data)
@@ -158,6 +177,7 @@ static void g233_soc_register_types(void)
 
 type_init(g233_soc_register_types)
 
+/* 初始化机器 */
 static void g233_machine_init(MachineState *machine)
 {
     MachineClass *mc = MACHINE_GET_CLASS(machine);
@@ -180,9 +200,6 @@ static void g233_machine_init(MachineState *machine)
     /* Initialize SoC */
     object_initialize_child(OBJECT(machine), "soc", &s->soc,
                             TYPE_RISCV_G233_SOC);
-    // object_property_set_str(OBJECT(&s->soc),
-    //                         "cpu-type", machine->cpu_type,
-    //                         &error_abort);
     qdev_realize(DEVICE(&s->soc), NULL, &error_fatal);
 
     /* Data Memory(DDR RAM) */
@@ -205,6 +222,7 @@ static void g233_machine_init(MachineState *machine)
     rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
                           memmap[G233_DEV_MROM].base, &address_space_memory);
 
+    /* 初始化引导信息结构体 */
     riscv_boot_info_init(&boot_info, &s->soc.cpus);
     if (machine->kernel_filename) {
         riscv_load_kernel(machine, &boot_info,

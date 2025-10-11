@@ -750,4 +750,81 @@ void helper_custom_dma(CPURISCVState *env, target_ulong dst,
     }
 }
 
+void helper_custom_sort(CPURISCVState *env, target_ulong sort_num,
+                        target_ulong addr, target_ulong array_num)
+{
+    for (target_ulong i = 0; i < sort_num - 1; i++) {
+        int swapped = 0;
+        for (target_ulong j = 0; j < sort_num - i - 1; j++) {
+            int arr_now = cpu_ldl_data(env, addr + j * sizeof(uint32_t));
+            int arr_next = cpu_ldl_data(env, addr + (j + 1) * sizeof(uint32_t));
+
+            if (arr_now > arr_next) {
+                int temp = arr_now;
+                /* arr_now = arr_next; */
+                cpu_stl_data(env, addr + j * sizeof(uint32_t), arr_next);
+                /* arr_next = temp; */
+                cpu_stl_data(env, addr + (j + 1) * sizeof(uint32_t), temp);
+
+                swapped = 1;
+            }
+        }
+        if (!swapped) {
+            break;
+        }
+    }
+}
+
+void helper_custom_crush(CPURISCVState *env, target_ulong dst,
+                         target_ulong src, target_ulong num)
+{
+    target_ulong i, j;
+    uint8_t val1, val2, packed;
+
+    if (num == 0) {
+        return;
+    }
+
+    j = 0;
+    i = 0;
+
+    while (i + 1 < num) {
+        val1 = cpu_ldub_data(env, src + i * sizeof(uint8_t));
+        val2 = cpu_ldub_data(env, src + (i + 1) * sizeof(uint8_t));
+
+        packed = (val1 & 0x0F) | ((val2 & 0x0F) << 4);
+
+        cpu_stb_data(env, dst + j * sizeof(uint8_t), packed);
+
+        i += 2;
+        j++;
+    }
+
+    if (i < num) {
+        val1 = cpu_ldub_data(env, src + i * sizeof(uint8_t));
+        packed = val1 & 0x0F;
+        cpu_stb_data(env, dst + j * sizeof(uint8_t), packed);
+        j++;
+    }
+}
+
+void helper_custom_expand(CPURISCVState *env, target_ulong dst,
+                          target_ulong src, target_ulong num)
+{
+    target_ulong i, j;
+    uint8_t val_src, val1, val2;
+
+    for (i = 0, j = 0; i < num; i++) {
+        val_src = cpu_ldub_data(env, src + i * sizeof(uint8_t));
+
+        val1 = val_src & 0x0F;
+        cpu_stb_data(env, dst + j * sizeof(uint8_t), val1);
+        j++;
+
+        val2 = (val_src >> 4) & 0x0F;
+        cpu_stb_data(env, dst + j * sizeof(uint8_t), val2);
+        j++;
+    }
+}
+
 #endif /* !CONFIG_USER_ONLY */
