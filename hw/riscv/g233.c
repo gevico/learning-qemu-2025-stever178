@@ -91,6 +91,7 @@ static void g233_soc_realize(DeviceState *dev, Error **errp)
     sysbus_realize(SYS_BUS_DEVICE(&s->cpus), &error_fatal);
 
     /* Mask ROM */
+    /* 直接方式 */
     /* 初始化内存区域 */
     memory_region_init_rom(&s->mask_rom, OBJECT(dev), "riscv.g233.mrom",
                            memmap[G233_DEV_MROM].size, &error_fatal);
@@ -99,6 +100,7 @@ static void g233_soc_realize(DeviceState *dev, Error **errp)
                                 &s->mask_rom);
 
     /* MMIO */
+    /* 设备模型方式 */
     s->plic = sifive_plic_create(memmap[G233_DEV_PLIC].base,
                                  (char *)G233_PLIC_HART_CONFIG, ms->smp.cpus, 0,
                                  G233_PLIC_NUM_SOURCES,
@@ -194,17 +196,13 @@ static void g233_machine_init(MachineState *machine)
         exit(EXIT_FAILURE);
     }
 
-    MemoryRegion *sys_mem = get_system_memory();
-    uint32_t mem_size = machine->ram_size;
-
     /* Initialize SoC */
     object_initialize_child(OBJECT(machine), "soc", &s->soc,
                             TYPE_RISCV_G233_SOC);
     qdev_realize(DEVICE(&s->soc), NULL, &error_fatal);
 
     /* Data Memory(DDR RAM) */
-    memory_region_init_ram(machine->ram, NULL, "g233.dram",
-                           mem_size, &error_fatal);
+    MemoryRegion *sys_mem = get_system_memory();
     memory_region_add_subregion(sys_mem, memmap[G233_DEV_DRAM].base,
                                 machine->ram);
     
