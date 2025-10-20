@@ -1,7 +1,7 @@
 /*
  * QEMU model of the G233 SPI Controller
  *
- * Copyright (c) 2025 Shengjie Lin 2874146120@qq.com
+ * Copyright (c) 2025 Learning QEMU 2025
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -110,47 +110,39 @@ static void g233_spi_write(void *opaque, hwaddr addr, uint64_t value, unsigned s
         g233_spi_update_irq(s);
         break;
     case SPI_SR:
-        /* Clear error flags - 注意：根据规格书是写1清除 */
-        if (value & SPI_SR_OVR) {
-            s->sr &= ~SPI_SR_OVR;
-        }
-        if (value & SPI_SR_UDR) {
-            s->sr &= ~SPI_SR_UDR;
-        }
+        /* Clear error flags */
+        s->sr &= ~(value & (SPI_SR_UDR | SPI_SR_OVR));
         g233_spi_update_irq(s);
         break;
     case SPI_DR:
         // qemu_log_mask(LOG_TRACE, 
         //     "SPI: Write DR=0x%02X, CR1=0x%02X, CSCTRL=0x%02X\n",
         //     (uint8_t)value, s->cr1, s->csctrl);
-            
         if (s->cr1 & SPI_CR1_SPE) {
-            /* 检查溢出 - 在写入新数据前检查 */
-            if (s->sr & SPI_SR_RXNE) {
-                s->sr |= SPI_SR_OVR;  /* 设置溢出标志 */
-            }
-            
-            /* 先设置要发送的数据 */
+            /* Check for overrun BEFORE starting transfer - if RX has unread data */
+            bool overrun = (s->rx_fifo_has_data && (s->sr & SPI_SR_RXNE));
+
             s->dr_tx = value & 0xFF;
-            
-            /* 更新状态：清除TXE，设置BSY */
-            s->sr &= ~SPI_SR_TXE;
-            s->sr |= SPI_SR_BSY;
-            
-            /* 立即进行SPI传输 - 使用当前写入的数据 */
+            s->sr &= ~SPI_SR_TXE;  /* Clear TXE */
+            s->sr |= SPI_SR_BSY;   /* Set busy */
+
+            /* Transfer byte through SSI bus */
             uint32_t rx = ssi_transfer(s->ssi, s->dr_tx);
+
             // qemu_log_mask(LOG_TRACE,
             //               "SPI: Transfer TX=0x%02X -> RX=0x%02X\n",
             //               s->dr_tx, rx & 0xFF);
             
-            /* 设置接收数据 */
+            /* Now handle overrun AFTER transfer */
+            if (overrun) {
+                s->sr |= SPI_SR_OVR;  /* Set overrun flag */
+            }
+
             s->dr_rx = rx & 0xFF;
-            
-            /* 传输完成：设置TXE和RXNE，清除BSY */
-            s->sr |= SPI_SR_TXE | SPI_SR_RXNE;
-            s->sr &= ~SPI_SR_BSY;
+            s->sr |= SPI_SR_TXE | SPI_SR_RXNE;  /* Set TXE and RXNE */
+            s->sr &= ~SPI_SR_BSY;                /* Clear busy */
             s->rx_fifo_has_data = true;
-            
+
             g233_spi_update_irq(s);
         }
         break;
@@ -161,36 +153,17 @@ static void g233_spi_write(void *opaque, hwaddr addr, uint64_t value, unsigned s
         s->prev_csctrl = s->csctrl;
         s->csctrl = value;
 
-        /* 根据规格书控制CS线：CS0_EN(bit0) + CS0_ACT(bit4) */
+        /* Control CS lines based on enable and active bits */
+        /* CS0: bits 0 (enable) and 4 (active) */
         if (s->cs_lines && s->cs_lines[0]) {
-            bool cs0_enabled = (value & 0x01) != 0;
-            bool cs0_active = (value & 0x10) != 0;
-            bool cs0_should_be_active = cs0_enabled && cs0_active;
-            qemu_set_irq(s->cs_lines[0], !cs0_should_be_active); /* CS低电平有效 */
+            bool cs0_active = (value & 0x11) == 0x11;  /* Both EN and ACT set */
+            qemu_set_irq(s->cs_lines[0], !cs0_active); /* CS is active low */
         }
 
-        /* CS1: CS1_EN(bit1) + CS1_ACT(bit5) */
+        /* CS1: bits 1 (enable) and 5 (active) */
         if (s->cs_lines && s->cs_lines[1]) {
-            bool cs1_enabled = (value & 0x02) != 0;
-            bool cs1_active = (value & 0x20) != 0;
-            bool cs1_should_be_active = cs1_enabled && cs1_active;
-            qemu_set_irq(s->cs_lines[1], !cs1_should_be_active);
-        }
-
-        /* CS2: CS2_EN(bit2) + CS2_ACT(bit6) */
-        if (s->cs_lines && s->cs_lines[2]) {
-            bool cs2_enabled = (value & 0x04) != 0;
-            bool cs2_active = (value & 0x40) != 0;
-            bool cs2_should_be_active = cs2_enabled && cs2_active;
-            qemu_set_irq(s->cs_lines[2], !cs2_should_be_active);
-        }
-
-        /* CS3: CS3_EN(bit3) + CS3_ACT(bit7) */
-        if (s->cs_lines && s->cs_lines[3]) {
-            bool cs3_enabled = (value & 0x08) != 0;
-            bool cs3_active = (value & 0x80) != 0;
-            bool cs3_should_be_active = cs3_enabled && cs3_active;
-            qemu_set_irq(s->cs_lines[3], !cs3_should_be_active);
+            bool cs1_active = (value & 0x22) == 0x22;  /* Both EN and ACT set */
+            qemu_set_irq(s->cs_lines[1], !cs1_active); /* CS is active low */
         }
         break;
     default:

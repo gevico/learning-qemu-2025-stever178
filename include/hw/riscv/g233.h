@@ -40,7 +40,8 @@ typedef struct G233SoCState {
     DeviceState *uart0;
     DeviceState *pwm0;
     SIFIVEGPIOState gpio;
-    G233SPIState spi0;
+    DeviceState *spi0;
+    // G233SPIState spi0;
     MemoryRegion mask_rom;
 } G233SoCState;
 

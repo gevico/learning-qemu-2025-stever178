@@ -1,7 +1,7 @@
 /*
  * QEMU model of the G233 SPI Controller
  *
- * Copyright (c) 2025 Shengjie Lin 2874146120@qq.com
+ * Copyright (c) 2025 Learning QEMU 2025
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
