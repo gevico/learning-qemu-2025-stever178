@@ -6,3 +6,6 @@
 
 # Load QEMU-specific sub-commands and settings
 source scripts/qemu-gdb.py
+
+source gdbinit.py
+

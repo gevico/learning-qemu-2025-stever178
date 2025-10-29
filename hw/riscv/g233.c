@@ -146,6 +146,7 @@ static void g233_soc_realize(DeviceState *dev, Error **errp)
     }
     sysbus_mmio_map(SYS_BUS_DEVICE(s->spi0), 0,
                     memmap[G233_DEV_SPI0].base);
+    /* 将 SPI 控制器的中断输出连接到 PLIC（中断控制器） 的输入 */
     sysbus_connect_irq(SYS_BUS_DEVICE(s->spi0), 0,
                        qdev_get_gpio_in(DEVICE(s->plic), G233_SPI0_IRQ));
 }
@@ -242,6 +243,7 @@ static void g233_machine_init(MachineState *machine)
         qdev_prop_set_uint32(flash_dev0, "size", 2 * 1024 * 1024);
         qdev_realize_and_unref(flash_dev0, BUS(spi_bus0), &error_fatal);
         flash_cs0 = qdev_get_gpio_in_named(flash_dev0, SSI_GPIO_CS, 0);
+        /* 将 SPI 控制器的片选(CS)输出连接到 Flash 设备的片选输入 */
         qdev_connect_gpio_out_named(s->soc.spi0, SSI_GPIO_CS, 0, flash_cs0);
 
         /* Flash 1: W25X32 (4MB) on CS1 */
@@ -259,6 +261,7 @@ static void g233_machine_init(MachineState *machine)
         qdev_prop_set_uint32(flash_dev1, "size", 4 * 1024 * 1024);
         qdev_realize_and_unref(flash_dev1, BUS(spi_bus0), &error_fatal);
         flash_cs1 = qdev_get_gpio_in_named(flash_dev1, SSI_GPIO_CS, 0);
+        /* 将 SPI 控制器的片选(CS)输出连接到 Flash 设备的片选输入 */
         qdev_connect_gpio_out_named(s->soc.spi0, SSI_GPIO_CS, 1, flash_cs1);
     }
 }
